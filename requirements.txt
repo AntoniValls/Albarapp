@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+sqlalchemy>=2.0
+aiosqlite
+alembic
+httpx
+python-multipart
