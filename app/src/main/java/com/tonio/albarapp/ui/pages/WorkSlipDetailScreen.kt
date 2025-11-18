@@ -13,6 +13,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import android.widget.Toast
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import androidx.compose.material.icons.filled.Comment
+import androidx.compose.material.icons.filled.Send
+import com.tonio.albarapp.data.Comment
+import com.tonio.albarapp.data.PdfGenerator
 import com.tonio.albarapp.User
 import com.tonio.albarapp.UserRole
 import com.tonio.albarapp.data.*
@@ -23,6 +32,7 @@ import java.text.NumberFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
 
 private fun euros(cents: Long): String =
     NumberFormat.getCurrencyInstance(Locale("es","ES")).format(cents / 100.0)
@@ -35,6 +45,8 @@ fun WorkSlipDetailScreen(
     onBack: () -> Unit
 ) {
     val workSlip = remember(workSlipId) { WorkSlipRepository.getById(workSlipId) }
+    val context = LocalContext.current
+    var isGeneratingPdf by remember { mutableStateOf(false) }
 
     if (workSlip == null) {
         Box(
@@ -188,6 +200,46 @@ fun WorkSlipDetailScreen(
                 }
             }
 
+            // Generate PDF button (always visible)
+            item {
+                Button(
+                    onClick = {
+                        isGeneratingPdf = true
+                        try {
+                            val pdfFile = PdfGenerator.generateWorkSlipPdf(context, workSlip)
+
+                            // Open the PDF
+                            val uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.provider",
+                                pdfFile
+                            )
+
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/pdf")
+                                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+
+                            context.startActivity(Intent.createChooser(intent, "Open PDF"))
+
+                            Toast.makeText(context, "PDF saved to Downloads", Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error generating PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                        } finally {
+                            isGeneratingPdf = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isGeneratingPdf
+                ) {
+                    Icon(Icons.Filled.PictureAsPdf, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (isGeneratingPdf) "Generating PDF..." else "Generate PDF")
+                }
+
+                Spacer(Modifier.height(16.dp))
+            }
+
             // Signatures
             item {
                 Card {
@@ -219,6 +271,105 @@ fun WorkSlipDetailScreen(
                                 label = "Manager Approval",
                                 signature = workSlip.managerApproval
                             )
+                        }
+                    }
+                }
+            }
+
+            // Comments Section
+            item {
+                Card {
+                    Column(Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Comments (${workSlip.comments.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Icon(
+                                Icons.Filled.Comment,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+
+                        if (workSlip.comments.isEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "No comments yet",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Spacer(Modifier.height(12.dp))
+                            workSlip.comments.forEach { comment ->
+                                CommentItem(comment)
+                                if (comment != workSlip.comments.last()) {
+                                    Spacer(Modifier.height(12.dp))
+                                    HorizontalDivider()
+                                    Spacer(Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Add Comment Section
+            item {
+                var commentText by remember { mutableStateOf("") }
+
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            "Add Comment",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = commentText,
+                            onValueChange = { commentText = it },
+                            placeholder = { Text("Write a comment...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            minLines = 2,
+                            maxLines = 4
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Button(
+                            onClick = {
+                                if (commentText.isNotBlank()) {
+                                    val comment = Comment.create(
+                                        id = UUID.randomUUID().toString(),
+                                        workSlipId = workSlip.id,
+                                        userId = currentUser.id,
+                                        userName = currentUser.name,
+                                        userRole = currentUser.role,
+                                        message = commentText.trim(),
+                                        timestamp = LocalDateTime.now()
+                                    )
+                                    WorkSlipRepository.addComment(workSlip.id, comment)
+                                    commentText = ""
+                                    onBack() // Refresh by going back
+                                }
+                            },
+                            enabled = commentText.isNotBlank(),
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Icon(Icons.Filled.Send, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Post Comment")
                         }
                     }
                 }
@@ -307,15 +458,46 @@ fun WorkSlipDetailScreen(
         )
     }
 
-    // Reject Dialog
+// Reject Dialog
     if (showRejectDialog) {
+        var rejectionReason by remember { mutableStateOf("") }
+
         AlertDialog(
             onDismissRequest = { showRejectDialog = false },
             title = { Text("Reject Work Slip") },
-            text = { Text("Are you sure you want to reject this work slip?") },
+            text = {
+                Column {
+                    Text("Please provide a reason for rejection:")
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = rejectionReason,
+                        onValueChange = { rejectionReason = it },
+                        placeholder = { Text("Enter rejection reason...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3,
+                        maxLines = 5
+                    )
+                }
+            },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
+                        // Add rejection comment
+                        if (rejectionReason.isNotBlank()) {
+                            val comment = Comment.create(
+                                id = UUID.randomUUID().toString(),
+                                workSlipId = workSlip.id,
+                                userId = currentUser.id,
+                                userName = currentUser.name,
+                                userRole = currentUser.role,
+                                message = rejectionReason.trim(),
+                                timestamp = LocalDateTime.now(),
+                                isRejectionReason = true
+                            )
+                            WorkSlipRepository.addComment(workSlip.id, comment)
+                        }
+
+                        // Update status
                         val updated = workSlip.copy(
                             status = WorkSlipStatus.REJECTED,
                             updatedAt = LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -323,9 +505,13 @@ fun WorkSlipDetailScreen(
                         WorkSlipRepository.update(updated)
                         showRejectDialog = false
                         onBack()
-                    }
+                    },
+                    enabled = rejectionReason.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
                 ) {
-                    Text("Reject", color = MaterialTheme.colorScheme.error)
+                    Text("Reject")
                 }
             },
             dismissButton = {
@@ -470,6 +656,8 @@ fun ManagerApprovalDialog(
                         ),
                         updatedAt = LocalDateTime.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
                     )
+                    WorkSlipRepository.update(updated)  // This line was missing!
+                    onApproved()  // This line was missing!
                 }
             ) {
                 Text("Approve")
@@ -481,4 +669,69 @@ fun ManagerApprovalDialog(
             }
         }
     )
+}
+
+@Composable
+fun CommentItem(comment: Comment) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        comment.userName,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = when (comment.userRole) {
+                                com.tonio.albarapp.UserRole.SUBCONTRACTOR -> MaterialTheme.colorScheme.tertiaryContainer
+                                com.tonio.albarapp.UserRole.CONTRACTOR -> MaterialTheme.colorScheme.secondaryContainer
+                                com.tonio.albarapp.UserRole.MANAGER -> MaterialTheme.colorScheme.primaryContainer
+                            }
+                        )
+                    ) {
+                        Text(
+                            comment.userRole.name.lowercase().replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Text(
+                    comment.getTimestamp().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (comment.isRejectionReason) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Text(
+                        "Rejection",
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            comment.message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
 }

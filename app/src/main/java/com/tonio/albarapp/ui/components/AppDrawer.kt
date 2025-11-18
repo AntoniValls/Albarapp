@@ -13,6 +13,11 @@ import com.tonio.albarapp.UserRole
 import com.tonio.albarapp.ui.navigation.DrawerItem
 import com.tonio.albarapp.ui.navigation.baseDrawerItems
 import com.tonio.albarapp.ui.navigation.managerDrawerItems
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import com.tonio.albarapp.R
 
 @Composable
 fun DrawerContent(
@@ -23,9 +28,31 @@ fun DrawerContent(
 ) {
     ModalDrawerSheet {
         Column(Modifier.fillMaxSize()) {
-            // Header
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("WorkSlip", style = MaterialTheme.typography.titleLarge)
+            // Header with logo and app name
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Logo
+                Icon(
+                    painter = painterResource(id = R.drawable.app_logo),
+                    contentDescription = "Albarapp Logo",
+                    modifier = Modifier.size(80.dp),
+                    tint = Color.Unspecified
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                // App name
+                Text(
+                    "Albarapp",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
                 Text(
                     "Civil Works Management",
                     style = MaterialTheme.typography.bodySmall,
@@ -55,6 +82,7 @@ fun DrawerContent(
                     }
                 }
             }
+
             HorizontalDivider()
 
             // Navigation items

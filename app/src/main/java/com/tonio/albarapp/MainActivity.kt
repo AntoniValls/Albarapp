@@ -3,6 +3,7 @@ package com.tonio.albarapp
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,7 +14,10 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.navigation.compose.*
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import com.tonio.albarapp.data.WorkSlipRepository
+import com.tonio.albarapp.data.UserRepository
 import com.tonio.albarapp.ui.components.DrawerContent
 import com.tonio.albarapp.ui.navigation.Routes
 import com.tonio.albarapp.ui.navigation.navigateToWorkSlipDetail
@@ -21,15 +25,25 @@ import com.tonio.albarapp.ui.pages.DashboardScreen
 import com.tonio.albarapp.ui.pages.ManagerApprovalsScreen
 import com.tonio.albarapp.ui.pages.NewWorkSlipScreen
 import com.tonio.albarapp.ui.pages.WorkSlipDetailScreen
+import com.tonio.albarapp.ui.pages.UserManagementScreen
 import com.tonio.albarapp.ui.theme.AlbarappTheme
 import kotlinx.coroutines.launch
+import androidx.compose.ui.Alignment
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize the WorkSlip repository with persistent storage
+        // Clear old data (temporary - remove after first run)
+        //getSharedPreferences("workslip_prefs", Context.MODE_PRIVATE)
+        //    .edit()
+        //    .clear()
+        //   .apply()
+
+        // Initialize repositories with persistent storage
         WorkSlipRepository.initialize(this)
+        UserRepository.initialize(this)
 
         setContent {
             AlbarappTheme {
@@ -77,7 +91,14 @@ fun AlbaranApp() {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("WorkSlip") },
+                    title = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Start
+                        ) {
+                            Text("Albarapp")
+                        }
+                    },
                     navigationIcon = {
                         IconButton(onClick = {
                             scope.launch {
@@ -130,6 +151,9 @@ fun AlbaranApp() {
                         onBack = { navController.popBackStack() }
                     )
                 }
+                composable(Routes.USER_MANAGEMENT) {
+                    UserManagementScreen()
+                }
             }
         }
     }
@@ -151,6 +175,8 @@ fun UserSelectionDialog(
     onUserSelected: (User) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val allUsers = remember { UserRepository.getAll() }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Switch User (Testing Mode)") },
@@ -159,28 +185,36 @@ fun UserSelectionDialog(
                 Text("Select a user to test different roles:")
                 Spacer(Modifier.height(16.dp))
 
-                MockUsers.allUsers.forEach { testUser ->
-                    TextButton(
-                        onClick = { onUserSelected(testUser) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = androidx.compose.ui.Alignment.Start
+                if (allUsers.isEmpty()) {
+                    Text(
+                        "No users available. Add users in Manage Users.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    allUsers.forEach { testUser ->
+                        TextButton(
+                            onClick = { onUserSelected(testUser) },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                testUser.name,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                "${testUser.role.name.lowercase().replaceFirstChar { it.uppercase() }} - ${testUser.email}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalAlignment = androidx.compose.ui.Alignment.Start
+                            ) {
+                                Text(
+                                    testUser.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    "${testUser.role.name.lowercase().replaceFirstChar { it.uppercase() }} - ${testUser.email}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                    }
-                    if (testUser != MockUsers.allUsers.last()) {
-                        HorizontalDivider()
+                        if (testUser != allUsers.last()) {
+                            HorizontalDivider()
+                        }
                     }
                 }
             }

@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.People
 import androidx.compose.ui.graphics.vector.ImageVector
 
 object Routes {
@@ -11,6 +12,7 @@ object Routes {
     const val NEW_WORKSLIP = "new_workslip"
     const val MANAGER_APPROVALS = "manager_approvals"
     const val WORKSLIP_DETAIL = "workslip_detail/{workSlipId}"
+    const val USER_MANAGEMENT = "user_management"
 }
 
 fun navigateToWorkSlipDetail(workSlipId: String): String {
@@ -24,7 +26,8 @@ data class DrawerItem(
 
 val baseDrawerItems = listOf(
     DrawerItem("Work Slips", Routes.DASHBOARD, Icons.Filled.Home),
-    DrawerItem("New Work Slip", Routes.NEW_WORKSLIP, Icons.Filled.Add)
+    DrawerItem("New Work Slip", Routes.NEW_WORKSLIP, Icons.Filled.Add),
+    DrawerItem("Manage Users", Routes.USER_MANAGEMENT, Icons.Filled.People)
 )
 
 val managerDrawerItems = listOf(

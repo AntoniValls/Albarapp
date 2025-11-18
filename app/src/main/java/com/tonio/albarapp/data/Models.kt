@@ -32,6 +32,43 @@ data class Signature(
     }
 }
 
+data class Comment(
+    val id: String,
+    val workSlipId: String,
+    val userId: String,
+    val userName: String,
+    val userRole: com.tonio.albarapp.UserRole,
+    val message: String,
+    val timestamp: String, // ISO format for JSON serialization
+    val isRejectionReason: Boolean = false
+) {
+    fun getTimestamp(): LocalDateTime = LocalDateTime.parse(timestamp, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+
+    companion object {
+        fun create(
+            id: String,
+            workSlipId: String,
+            userId: String,
+            userName: String,
+            userRole: com.tonio.albarapp.UserRole,
+            message: String,
+            timestamp: LocalDateTime,
+            isRejectionReason: Boolean = false
+        ): Comment {
+            return Comment(
+                id = id,
+                workSlipId = workSlipId,
+                userId = userId,
+                userName = userName,
+                userRole = userRole,
+                message = message,
+                timestamp = timestamp.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                isRejectionReason = isRejectionReason
+            )
+        }
+    }
+}
+
 data class WorkSlip(
     val id: String,
     val title: String,
@@ -56,7 +93,9 @@ data class WorkSlip(
     val managerApproval: Signature? = null,
 
     val createdAt: String, // Changed to String for JSON serialization
-    val updatedAt: String  // Changed to String for JSON serialization
+    val updatedAt: String,  // Changed to String for JSON serialization
+
+    val comments: List<Comment> = emptyList()
 ) {
     // Helper functions to get LocalDate/LocalDateTime
     fun getDate(): LocalDate = LocalDate.parse(date)
@@ -149,9 +188,12 @@ object WorkSlipRepository {
                 workSlips.filter { it.contractorId == userId }
             }
             com.tonio.albarapp.UserRole.MANAGER -> {
+                // See work slips pending approval or already approved/rejected by them
                 workSlips.filter {
                     it.managerId == userId &&
-                            it.status == WorkSlipStatus.PENDING_MANAGER
+                            (it.status == WorkSlipStatus.PENDING_MANAGER ||
+                                    it.status == WorkSlipStatus.APPROVED ||
+                                    it.status == WorkSlipStatus.REJECTED)
                 }
             }
         }
@@ -172,5 +214,14 @@ object WorkSlipRepository {
 
     fun getById(id: String): WorkSlip? {
         return workSlips.find { it.id == id }
+    }
+
+    fun addComment(workSlipId: String, comment: Comment) {
+        val workSlip = getById(workSlipId)
+        if (workSlip != null) {
+            val updatedComments = workSlip.comments + comment
+            val updatedWorkSlip = workSlip.copy(comments = updatedComments)
+            update(updatedWorkSlip)
+        }
     }
 }

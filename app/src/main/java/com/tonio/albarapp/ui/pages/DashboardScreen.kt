@@ -29,14 +29,13 @@ fun DashboardScreen(
     }
 
     var search by remember { mutableStateOf(TextFieldValue("")) }
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember(currentUser) { mutableStateOf(0) }
 
     // Tab labels change based on user role
     val tabs = when (currentUser.role) {
         UserRole.SUBCONTRACTOR -> listOf("All", "Draft", "Pending Contractor", "Approved")
         UserRole.CONTRACTOR -> listOf("All", "To Sign", "Pending Manager", "Approved")
-        UserRole.MANAGER -> listOf("All", "Pending Approval")
-        else -> listOf("All")
+        UserRole.MANAGER -> listOf("All", "Pending Approval", "Approved", "Rejected")        else -> listOf("All")
     }
 
     val filtered = remember(userWorkSlips, search, selectedTab, currentUser) {
@@ -56,6 +55,8 @@ fun DashboardScreen(
             }
             UserRole.MANAGER -> when (selectedTab) {
                 1 -> userWorkSlips.filter { it.status == WorkSlipStatus.PENDING_MANAGER }
+                2 -> userWorkSlips.filter { it.status == WorkSlipStatus.APPROVED }
+                3 -> userWorkSlips.filter { it.status == WorkSlipStatus.REJECTED }
                 else -> userWorkSlips
             }
         }
@@ -174,6 +175,8 @@ fun DashboardScreen(
                         }
                         UserRole.MANAGER -> when (index) {
                             1 -> userWorkSlips.count { it.status == WorkSlipStatus.PENDING_MANAGER }
+                            2 -> userWorkSlips.count { it.status == WorkSlipStatus.APPROVED }
+                            3 -> userWorkSlips.count { it.status == WorkSlipStatus.REJECTED }
                             else -> userWorkSlips.size
                         }
                     }
